@@ -1,1 +1,5 @@
-node_modules/\n.env\n*.log\n.DS_Store
+node_modules/
+.env
+*.log
+.DS_Store
+package-lock.json
