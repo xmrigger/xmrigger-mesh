@@ -47,7 +47,7 @@ them but cannot send or consume them.
 ## Quick start
 
 ```bash
-git clone https://github.com/tnzxpool/xmr-mesh
+git clone https://github.com/xmr-hashguard/xmr-mesh
 cd xmr-mesh
 npm install
 node poc/demo.js   # two nodes, real encryption, prevhash detection
@@ -109,8 +109,8 @@ node.on(OPEN.PREVHASH_ANNOUNCE, ({ payload, peerId }) => {
 
 | Repo | Role |
 |------|------|
-| [xmr-hashguard](https://github.com/tnzxpool/xmr-hashguard) | Detection library that uses this mesh as its federation transport |
-| [xmr-proxy](https://github.com/tnzxpool/xmr-proxy) | Full Stratum proxy — wires hashguard + mesh together for XMRig |
+| [xmr-hashguard](https://github.com/xmr-hashguard/xmr-hashguard) | Detection library that uses this mesh as its federation transport |
+| [xmr-proxy](https://github.com/xmr-hashguard/xmr-proxy) | Full Stratum proxy — wires hashguard + mesh together for XMRig |
 
 ---
 
