@@ -1,0 +1,21 @@
+{
+  "name": "xmr-mesh",
+  "version": "0.1.0",
+  "description": "Encrypted P2P gossip mesh for Monero proxy federation. Zero external dependencies.",
+  "license": "LGPL-2.1",
+  "main": "index.js",
+  "engines": {
+    "node": ">=15.0.0"
+  },
+  "keywords": [
+    "monero", "xmr", "mining", "federation", "p2p", "gossip",
+    "mesh", "encrypted", "stratum", "proxy"
+  ],
+  "scripts": {
+    "demo": "node poc/demo.js",
+    "test": "echo 'No test suite yet — see poc/ for live demo' && exit 0"
+  },
+  "dependencies": {
+    "ws": "^8.0.0"
+  }
+}
