@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "demo": "node poc/demo.js",
-    "test": "echo 'No test suite yet — see poc/ for live demo' && exit 0"
+    "test": "node test/index.js"
   },
   "dependencies": {
     "ws": "^8.0.0"
