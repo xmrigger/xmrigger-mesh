@@ -104,6 +104,16 @@ node.on(OPEN.PREVHASH_ANNOUNCE, ({ payload, peerId }) => {
 - **Mesh port should not be exposed to the internet** without additional
   access control. Bind to a trusted interface or use a firewall rule.
 
+- **No channel fairness or rate limiting.** All channel types share the same
+  WebSocket connection with no priority ordering. A node sending high-frequency
+  messages on extended or system channels can delay delivery of time-sensitive
+  frames (`PREVHASH_ANNOUNCE`, `GUARD_ALERT`). A future version should define
+  priority classes (critical vs extended), per-peer rate limits, and
+  autocorrection mechanisms (selective dropping of non-critical frames under
+  load). Until then, implementations adding channels beyond the core protocol
+  are responsible for self-limiting their traffic to preserve detection
+  latency.
+
 ---
 
 ## Related
