@@ -1,7 +1,7 @@
 {
-  "name": "xmr-mesh",
+  "name": "xmrigger-mesh",
   "version": "0.1.0",
-  "description": "Encrypted P2P gossip mesh for Monero proxy federation. Zero external dependencies.",
+  "description": "Encrypted P2P gossip mesh for xmrigger proxy federation. Zero external dependencies.",
   "author": "tnzx@proton.me",
   "license": "LGPL-2.1",
   "main": "index.js",

@@ -26,14 +26,14 @@ const KEY_LEN    = 32;
  * Uses HKDF-SHA256 so the mesh identity is unlinkable to the source seed.
  *
  * @param {Buffer|string} seed  Wallet seed or any secret
- * @param {string}        [label='xmr-mesh-v1']
+ * @param {string}        [label='xmrigger-mesh-v1']
  * @returns {{ privateKey: Buffer, publicKey: Buffer }}
  */
 // TODO v0.2: Node.js crypto does not expose raw X25519 scalar import (v15-v22).
 // Until then, seed is ignored and identity is ephemeral (regenerated on restart).
 function deriveIdentity(seed, _label) {
   if (seed != null) {
-    console.warn('[xmr-mesh] deriveIdentity: seed ignored — persistent identity not yet implemented (v0.2)');
+    console.warn('[xmrigger-mesh] deriveIdentity: seed ignored — persistent identity not yet implemented (v0.2)');
   }
   return generateEphemeralKeypair();
 }

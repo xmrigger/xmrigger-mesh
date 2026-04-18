@@ -1,4 +1,4 @@
-# xmr-mesh
+# xmrigger-mesh
 
 Encrypted P2P gossip transport for Monero proxy federation.
 
@@ -31,7 +31,7 @@ Persistent identity from a seed is not implemented yet (v0.2 roadmap).
 ## Channel types
 
 ```js
-const { OPEN } = require('xmr-mesh');
+const { OPEN } = require('xmrigger-mesh');
 
 OPEN.PREVHASH_ANNOUNCE  // pool prevhash broadcast
 OPEN.GUARD_ALERT        // hashrate concentration hint from peer
@@ -47,8 +47,8 @@ them but cannot send or consume them.
 ## Quick start
 
 ```bash
-git clone https://github.com/xmr-hashguard/xmr-mesh
-cd xmr-mesh
+git clone https://github.com/xmrigger/xmrigger-mesh
+cd xmrigger-mesh
 npm install
 node poc/demo.js   # two nodes, real encryption, prevhash detection
 ```
@@ -58,7 +58,7 @@ node poc/demo.js   # two nodes, real encryption, prevhash detection
 ## Usage
 
 ```js
-const { MeshNode, OPEN } = require('xmr-mesh');
+const { MeshNode, OPEN } = require('xmrigger-mesh');
 
 const node = new MeshNode({
   port:  8765,
@@ -109,8 +109,8 @@ node.on(OPEN.PREVHASH_ANNOUNCE, ({ payload, peerId }) => {
 
 | Repo | Role |
 |------|------|
-| [xmr-hashguard](https://github.com/xmr-hashguard/xmr-hashguard) | Detection library that uses this mesh as its federation transport |
-| [xmr-proxy](https://github.com/xmr-hashguard/xmr-proxy) | Full Stratum proxy — wires hashguard + mesh together for XMRig |
+| [xmrigger](https://github.com/xmrigger/xmrigger) | Detection library that uses this mesh as its federation transport |
+| [xmrigger-proxy](https://github.com/xmrigger/xmrigger-proxy) | Full Stratum proxy — wires hashguard + mesh together for XMRig |
 
 ---
 

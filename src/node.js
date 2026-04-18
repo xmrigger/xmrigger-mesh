@@ -45,7 +45,7 @@ class MeshNode extends EventEmitter {
     seeds           = [],
     port            = 8765,
     seed            = null,
-    name            = 'xmr-mesh-node',
+    name            = 'xmrigger-mesh-node',
     minPeersForAlert = 2,
     tls             = null,
   } = {}) {
@@ -96,7 +96,7 @@ class MeshNode extends EventEmitter {
   on(typeIdOrEvent, handler) {
     if (typeof typeIdOrEvent === 'number') {
       if (isSystemType(typeIdOrEvent)) {
-        console.warn(`[xmr-mesh] System channel 0x${typeIdOrEvent.toString(16)} — handler not available`);
+        console.warn(`[xmrigger-mesh] System channel 0x${typeIdOrEvent.toString(16)} — handler not available`);
         return this;
       }
       this._handlers.set(typeIdOrEvent, handler);
@@ -194,7 +194,7 @@ class MeshNode extends EventEmitter {
       const handler = this._handlers.get(typeId);
       if (handler) {
         try { handler({ payload, peerId }); } catch (e) {
-          console.error(`[xmr-mesh] Handler error for ${typeName(typeId)}:`, e.message);
+          console.error(`[xmrigger-mesh] Handler error for ${typeName(typeId)}:`, e.message);
         }
       }
       this.emit('message', { typeId, payload, peerId });
