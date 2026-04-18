@@ -1,10 +1,16 @@
 {
   "name": "xmrigger-mesh",
   "version": "0.1.0",
-  "description": "Encrypted P2P gossip mesh for xmrigger proxy federation. Zero external dependencies.",
+  "description": "Encrypted P2P gossip mesh for xmrigger proxy federation. One external dependency: ws.",
   "author": "tnzx@proton.me",
   "license": "LGPL-2.1",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xmrigger/xmrigger-mesh.git"
+  },
+  "homepage": "https://github.com/xmrigger/xmrigger-mesh#readme",
+  "bugs": "https://github.com/xmrigger/xmrigger-mesh/issues",
   "engines": {
     "node": ">=15.0.0"
   },
