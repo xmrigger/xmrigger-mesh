@@ -8,7 +8,9 @@
  *   Both sides derive shared key via X25519 ECDH.
  *   All further frames: encrypt(pad(JSON)) with AES-256-GCM.
  *
- * @license LGPL-2.1
+ * @version  0.1.0
+ * @released 2026-04-18
+ * @license  LGPL-2.1
  */
 
 const { EventEmitter }  = require('events');

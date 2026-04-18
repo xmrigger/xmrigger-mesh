@@ -7,7 +7,9 @@
  *                             Nodes that receive a system message emit it as
  *                             a 'system-message' event and silently discard it.
  *
- * @license LGPL-2.1
+ * @version  0.1.0
+ * @released 2026-04-18
+ * @license  LGPL-2.1
  */
 
 const OPEN = {

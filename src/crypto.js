@@ -9,7 +9,9 @@
  * Wire format per message:
  *   [ 2B length ][ 12B nonce ][ NB ciphertext+tag ]
  *
- * @license LGPL-2.1
+ * @version  0.1.0
+ * @released 2026-04-18
+ * @license  LGPL-2.1
  */
 
 const crypto = require('crypto');
