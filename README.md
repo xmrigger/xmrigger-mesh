@@ -107,12 +107,40 @@ node.on(OPEN.PREVHASH_ANNOUNCE, ({ payload, peerId }) => {
 - **No channel fairness or rate limiting.** All channel types share the same
   WebSocket connection with no priority ordering. A node sending high-frequency
   messages on extended or system channels can delay delivery of time-sensitive
-  frames (`PREVHASH_ANNOUNCE`, `GUARD_ALERT`). A future version should define
-  priority classes (critical vs extended), per-peer rate limits, and
-  autocorrection mechanisms (selective dropping of non-critical frames under
-  load). Until then, implementations adding channels beyond the core protocol
-  are responsible for self-limiting their traffic to preserve detection
-  latency.
+  frames (`PREVHASH_ANNOUNCE`, `GUARD_ALERT`). Until addressed, implementations
+  adding channels beyond the core protocol are responsible for self-limiting
+  their traffic to preserve detection latency.
+
+---
+
+## Architecture direction — multi-connection per peer
+
+The correct solution to channel fairness is **connection separation by channel
+group**, not priority queuing on a shared connection:
+
+```
+peer A ←— conn[0] CORE ————→ peer B   [0x01 0x02 0x10 0x11]  protected
+peer A ←— conn[1] OPEN ext ——→ peer B  [0x03..0xFF]           rate-limited
+peer A ←— conn[2] SYSTEM ————→ peer B  [0x100+]               rate-limited
+```
+
+Each connection is an independent WebSocket with its own ECDH handshake and
+session key. A flood on `conn[1]` or `conn[2]` never reaches `conn[0]`.
+Rate limit per non-core connection is determined by the node operator or
+auto-derived from available bandwidth divided by active connection count.
+`conn[0]` is always exempt from rate calculations.
+
+**Current state:** single connection per peer, static. Channel-to-connection
+mapping and per-connection rate limits are not yet implemented.
+
+**Hardening required before production use of extended/system channels:**
+- Dynamic negotiation of connection slots in the handshake
+- Per-connection token-bucket rate limiting (operator-configurable, with a
+  sensible default, e.g. 20 frames/s)
+- Automatic floor guarantee for `conn[0]` regardless of other connection load
+
+Until this is implemented, any high-frequency use of non-core channels on a
+shared connection risks degrading selfish mining detection for all peers.
 
 ---
 
