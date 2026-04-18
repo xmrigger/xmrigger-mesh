@@ -17,7 +17,9 @@
  *   - Sovereignty: each node decides independently — no peer can force action
  *   - Majority threshold: alerts fire only when minPeersForAlert peers agree
  *
- * @license LGPL-2.1
+ * @version  0.1.0
+ * @released 2026-04-18
+ * @license  LGPL-2.1
  */
 
 const { EventEmitter } = require('events');
