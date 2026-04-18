@@ -1,8 +1,8 @@
 # xmrigger-mesh
 
-Encrypted P2P gossip transport for Monero proxy federation.
+Encrypted P2P transport that connects xmrigger-proxy instances. Gossip mesh over WebSocket with X25519 ECDH + AES-256-GCM, payloads bucket-padded to fixed sizes to hide content length. The channel through which proxies exchange prevhash values in real time to detect selfish mining. One dependency: `ws`.
 
-Zero external dependencies beyond `ws`. Node.js ≥15.
+Part of the [xmrigger suite](https://github.com/xmrigger): `xmrigger` · `xmrigger-mesh` · `xmrigger-proxy`
 
 ---
 
