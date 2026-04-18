@@ -157,7 +157,7 @@ class MeshNode extends EventEmitter {
   // ── Client ────────────────────────────────────────────────────────────────
 
   _connect(url) {
-    const ws = new WebSocket(url, { rejectUnauthorized: false });
+    const ws = new WebSocket(url);
     ws.on('open', () => {
       const session = new Session({
         ws,
