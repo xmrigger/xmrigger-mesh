@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * poc/demo.js — hashguard-mesh live demo
+ * poc/demo.js — xmrigger-mesh live demo
  *
  * Two real MeshNode instances, real WebSocket connections, real encryption.
  * No mocks for the transport layer.
@@ -19,7 +19,7 @@
 'use strict';
 
 const { MeshNode, OPEN } = require('..');
-const { PrevhashMonitor } = require('../../xmr-hashguard');
+const { PrevhashMonitor } = require('../../xmrigger');
 
 // ── ANSI ──────────────────────────────────────────────────────────────────────
 const R      = '\x1b[0m';
@@ -59,7 +59,7 @@ let _prevhashB = PHASES[0].phB;
 async function main() {
   console.log(`
 ${B('╔══════════════════════════════════════════════════════════╗')}
-${B('║')}         ${B('hashguard-mesh — Encrypted Mesh Demo (v0.1.0)')}          ${B('║')}
+${B('║')}         ${B('xmrigger-mesh — Encrypted Mesh Demo (v0.1.0)')}          ${B('║')}
 ${B('╠══════════════════════════════════════════════════════════╣')}
 ${B('║')}  Transport  : WebSocket + X25519 ECDH + AES-256-GCM   ${B('║')}
 ${B('║')}  Padding    : bucket sizes 256/512/1024/2048 B         ${B('║')}
