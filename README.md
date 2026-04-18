@@ -110,7 +110,7 @@ node.on(OPEN.PREVHASH_ANNOUNCE, ({ payload, peerId }) => {
 | Repo | Role |
 |------|------|
 | [xmrigger](https://github.com/xmrigger/xmrigger) | Detection library that uses this mesh as its federation transport |
-| [xmrigger-proxy](https://github.com/xmrigger/xmrigger-proxy) | Full Stratum proxy — wires hashguard + mesh together for XMRig |
+| [xmrigger-proxy](https://github.com/xmrigger/xmrigger-proxy) | Full Stratum proxy — wires xmrigger guards + mesh together for XMRig |
 
 ---
 
