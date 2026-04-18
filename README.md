@@ -86,6 +86,20 @@ node.on(OPEN.PREVHASH_ANNOUNCE, ({ payload, peerId }) => {
 
 ---
 
+## Tests
+
+```bash
+npm test
+# or: node test/index.js
+```
+
+12 tests — no external dependencies, no network calls.
+
+Covers: X25519 ECDH key exchange, AES-256-GCM encrypt/decrypt, tamper
+detection, bucket padding and unpadding.
+
+---
+
 ## Known limitations
 
 - **No peer authentication.** Any node can join the mesh. A Sybil attacker
