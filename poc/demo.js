@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * poc/demo.js — xmr-mesh live demo
+ * poc/demo.js — hashguard-mesh live demo
  *
  * Two real MeshNode instances, real WebSocket connections, real encryption.
  * No mocks for the transport layer.
@@ -59,7 +59,7 @@ let _prevhashB = PHASES[0].phB;
 async function main() {
   console.log(`
 ${B('╔══════════════════════════════════════════════════════════╗')}
-${B('║')}         ${B('xmr-mesh — Encrypted Mesh Demo (v0.1.0)')}          ${B('║')}
+${B('║')}         ${B('hashguard-mesh — Encrypted Mesh Demo (v0.1.0)')}          ${B('║')}
 ${B('╠══════════════════════════════════════════════════════════╣')}
 ${B('║')}  Transport  : WebSocket + X25519 ECDH + AES-256-GCM   ${B('║')}
 ${B('║')}  Padding    : bucket sizes 256/512/1024/2048 B         ${B('║')}
