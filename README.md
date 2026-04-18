@@ -39,8 +39,9 @@ OPEN.PEER_HELLO         // node introduction
 OPEN.PEER_BYE           // graceful disconnect
 ```
 
-System channels (0x100+) are reserved. Nodes without a system key receive
-them but cannot send or consume them.
+System channels (0x100+) are reserved as extension points for downstream
+implementations. Standard nodes receive and decrypt these frames but discard
+them silently — they have no effect on mesh behaviour.
 
 ---
 
@@ -114,6 +115,7 @@ node.on(OPEN.PREVHASH_ANNOUNCE, ({ payload, peerId }) => {
 
 ---
 
-## License
+## Project
 
-[LGPL-2.1](LICENSE)
+`xmrigger-mesh` is part of the [TNZX project](https://github.com/tnzx-project).
+Released under [LGPL-2.1](LICENSE).
