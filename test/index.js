@@ -4,9 +4,9 @@
  * Run: node test/index.js
  */
 
-import { test, describe } from 'node:test';
-import assert from 'node:assert/strict';
-import {
+const { test, describe } = require('node:test');
+const assert             = require('node:assert/strict');
+const {
   generateEphemeralKeypair,
   deriveSessionKey,
   encrypt,
@@ -15,7 +15,7 @@ import {
   unpad,
   NONCE_LEN,
   TAG_LEN,
-} from '../src/crypto.js';
+} = require('../src/crypto');
 
 // ── Crypto layer ──────────────────────────────────────────────────────────────
 
