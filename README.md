@@ -39,9 +39,12 @@ OPEN.PEER_HELLO         // node introduction
 OPEN.PEER_BYE           // graceful disconnect
 ```
 
-System channels (0x100+) are reserved as extension points for downstream
-implementations. Standard nodes receive and decrypt these frames but discard
-them silently — they have no effect on mesh behaviour.
+The channel ID space above `0xFF` is split into two ranges:
+
+- **`0x100`–`0x1FF` (core system):** hard-blocked. Registering a handler throws.
+  Received frames are silently dropped — not relayed, not emitted.
+- **`0x200`–`0xFFFF` (extension range):** open for use by subclasses that
+  override `supportsExtendedChannels()`. See [EXTENDING.md](EXTENDING.md).
 
 ---
 
@@ -127,6 +130,37 @@ detection, bucket padding and unpadding.
 
 ---
 
+## Why client miners do not use WebSocket
+
+xmrigger-mesh is a **proxy-to-proxy** transport. The WebSocket connections
+it establishes are between `xmrigger-proxy` instances — not between miners
+and pools.
+
+The miner-to-proxy leg is plain Stratum TCP on port 3333. This is intentional.
+
+A miner that opens an additional WebSocket connection to a relay service is
+immediately distinguishable from one that does not. That connection:
+
+- reveals the miner's IP to the relay operator
+- is visible to ISPs and network monitors as a non-mining connection
+- can be blocked or throttled independently of the mining connection
+- associates the miner's identity with the relay network
+
+The mining Stratum stream itself carries all the bandwidth that a miner
+legitimately generates. Any additional signalling a miner needs — protocol
+extensions, coordination messages, application payloads — can be embedded
+inside that stream without opening new connections.
+
+Embedding produces a traffic profile **statistically indistinguishable from
+stock XMRig**. There is no new port, no new TLS handshake, no new IP endpoint
+to observe or block. The only observable fact is that the miner mines.
+
+xmrigger-proxy can carry extension payloads between proxies via the mesh
+(system channel frames, which standard nodes relay without inspecting).
+From a miner's perspective the connection count stays at one.
+
+---
+
 ## Architecture direction — multi-connection per peer
 
 The correct solution to channel fairness is **connection separation by channel
@@ -135,7 +169,7 @@ group**, not priority queuing on a shared connection:
 ```
 peer A ←— conn[0] CORE ————→ peer B   [0x01 0x02 0x10 0x11]  protected
 peer A ←— conn[1] OPEN ext ——→ peer B  [0x03..0xFF]           rate-limited
-peer A ←— conn[2] SYSTEM ————→ peer B  [0x100+]               rate-limited
+peer A ←— conn[2] EXT ——————→ peer B  [0x200+]               rate-limited
 ```
 
 Each connection is an independent WebSocket with its own ECDH handshake and
@@ -169,5 +203,4 @@ shared connection risks degrading selfish mining detection for all peers.
 
 ## Project
 
-`xmrigger-mesh` is part of the [TNZX project](https://github.com/tnzx-project).
 Released under [LGPL-2.1](LICENSE).

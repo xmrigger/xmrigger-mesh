@@ -1,6 +1,6 @@
 'use strict';
 /**
- * xmrigger-mesh test suite — crypto layer + bucket padding
+ * xmrigger-mesh test suite — crypto layer, bucket padding, channel type enforcement
  * Run: node test/index.js
  *
  * @version  0.1.0
@@ -20,6 +20,8 @@ const {
   NONCE_LEN,
   TAG_LEN,
 } = require('../src/crypto');
+const { isCoreSystemType, isExtensionType } = require('../src/types');
+const { MeshNode, OPEN }                    = require('../src/node');
 
 // ── Crypto layer ──────────────────────────────────────────────────────────────
 
@@ -211,6 +213,88 @@ describe('Bucket padding', () => {
     const tooShort = Buffer.alloc(NONCE_LEN + TAG_LEN - 1, 0);
     const result   = decrypt(key, tooShort);
     assert.strictEqual(result, null, 'decrypt must return null for truncated buffer');
+  });
+
+});
+
+// ── Channel type classification ───────────────────────────────────────────────
+
+describe('Channel type classification', () => {
+
+  test('isCoreSystemType: true for 0x100–0x1FF only', () => {
+    assert.strictEqual(isCoreSystemType(0x0FF), false, '0xFF is open channel');
+    assert.strictEqual(isCoreSystemType(0x100), true,  '0x100 is core system');
+    assert.strictEqual(isCoreSystemType(0x150), true,  '0x150 is core system');
+    assert.strictEqual(isCoreSystemType(0x1FF), true,  '0x1FF is core system');
+    assert.strictEqual(isCoreSystemType(0x200), false, '0x200 is extension range');
+    assert.strictEqual(isCoreSystemType(0xFFFF), false,'0xFFFF is extension range');
+  });
+
+  test('isExtensionType: true for 0x200+ only', () => {
+    assert.strictEqual(isExtensionType(0x1FF), false, '0x1FF is core system, not extension');
+    assert.strictEqual(isExtensionType(0x200), true,  '0x200 is extension range');
+    assert.strictEqual(isExtensionType(0xFFFF), true, '0xFFFF is extension range');
+  });
+
+});
+
+// ── MeshNode channel enforcement ─────────────────────────────────────────────
+
+describe('MeshNode channel enforcement', () => {
+
+  test('on() throws for core system range 0x100–0x1FF', () => {
+    const node = new MeshNode({ port: 0 });
+    assert.throws(
+      () => node.on(0x100, () => {}),
+      /reserved range/,
+      'registering handler for 0x100 must throw'
+    );
+    assert.throws(
+      () => node.on(0x1FF, () => {}),
+      /reserved range/,
+      'registering handler for 0x1FF must throw'
+    );
+  });
+
+  test('broadcast() throws for core system range 0x100–0x1FF', () => {
+    const node = new MeshNode({ port: 0 });
+    assert.throws(
+      () => node.broadcast(0x100, {}),
+      /reserved range/,
+      'broadcast on 0x100 must throw'
+    );
+  });
+
+  test('sendTo() throws for core system range 0x100–0x1FF', () => {
+    const node = new MeshNode({ port: 0 });
+    assert.throws(
+      () => node.sendTo('peer', 0x150, {}),
+      /reserved range/,
+      'sendTo on 0x150 must throw'
+    );
+  });
+
+  test('on() warns and ignores extension channel without supportsExtendedChannels()', () => {
+    const node = new MeshNode({ port: 0 });
+    const result = node.on(0x200, () => {});
+    assert.strictEqual(result, node, 'must return node for chaining even when ignored');
+  });
+
+  test('on() registers extension channel handler when supportsExtendedChannels() is true', () => {
+    class ExtNode extends MeshNode {
+      supportsExtendedChannels() { return true; }
+    }
+    const node = new ExtNode({ port: 0 });
+    let called = false;
+    node.on(0x200, () => { called = true; });
+    assert.strictEqual(node._handlers.has(0x200), true, 'handler must be registered');
+  });
+
+  test('open channels 0x01–0xFF register without restriction', () => {
+    const node = new MeshNode({ port: 0 });
+    node.on(OPEN.PREVHASH_ANNOUNCE, () => {});
+    assert.strictEqual(node._handlers.has(OPEN.PREVHASH_ANNOUNCE), true,
+      'open channel handler must be registered');
   });
 
 });

@@ -13,7 +13,7 @@
  *   - Forward secrecy: ephemeral X25519 per session
  *   - AEAD: AES-256-GCM, every frame authenticated
  *   - Payload size hidden: bucket padding (256/512/1024/2048 B)
- *   - System channels: reserved type IDs, null handlers without system key
+ *   - System channels: 0x100–0x1FF hard-blocked, 0x200+ via supportsExtendedChannels()
  *   - Sovereignty: each node decides independently — no peer can force action
  *   - Majority threshold: alerts fire only when minPeersForAlert peers agree
  *
@@ -28,7 +28,7 @@ const https = require('https');
 const { WebSocket, WebSocketServer } = require('ws');
 const { generateEphemeralKeypair } = require('./crypto');
 const { Session } = require('./session');
-const { OPEN, typeName, isSystemType } = require('./types');
+const { OPEN, typeName, isCoreSystemType, isExtensionType } = require('./types');
 
 const RECONNECT_MS      = 15_000;
 const PEER_STALE_MS     = 120_000;
@@ -92,13 +92,36 @@ class MeshNode extends EventEmitter {
   // ── Channel handler registration ──────────────────────────────────────────
 
   /**
-   * Register a handler for an open channel type.
-   * System types (≥0x100) cannot be registered from open-source code.
+   * Override in a subclass to enable extension channel (0x200+) registration.
+   * The base implementation returns false — extension channels are ignored in
+   * standard nodes. Subclasses that need application-specific channels should
+   * return true here and register handlers via on(typeId, handler).
+   *
+   * @returns {boolean}
+   */
+  supportsExtendedChannels() { return false; }
+
+  /**
+   * Register a handler for a channel type.
+   *
+   * 0x01–0xFF:   open channels — always allowed.
+   * 0x100–0x1FF: core system range — unconditionally rejected. Throws.
+   * 0x200–0xFFFF: extension range — allowed only if supportsExtendedChannels()
+   *               returns true.
    */
   on(typeIdOrEvent, handler) {
     if (typeof typeIdOrEvent === 'number') {
-      if (isSystemType(typeIdOrEvent)) {
-        console.warn(`[xmrigger-mesh] System channel 0x${typeIdOrEvent.toString(16)} — handler not available`);
+      if (isCoreSystemType(typeIdOrEvent)) {
+        throw new Error(
+          `[xmrigger-mesh] Channel 0x${typeIdOrEvent.toString(16)} is in the ` +
+          `reserved range (0x100–0x1FF) and cannot be registered in this distribution.`
+        );
+      }
+      if (isExtensionType(typeIdOrEvent) && !this.supportsExtendedChannels()) {
+        console.warn(
+          `[xmrigger-mesh] Extension channel 0x${typeIdOrEvent.toString(16)} ` +
+          `requires supportsExtendedChannels() — handler ignored.`
+        );
         return this;
       }
       this._handlers.set(typeIdOrEvent, handler);
@@ -116,6 +139,12 @@ class MeshNode extends EventEmitter {
    * @returns {number} peers reached
    */
   broadcast(typeId, payload) {
+    if (isCoreSystemType(typeId)) {
+      throw new Error(
+        `[xmrigger-mesh] Channel 0x${typeId.toString(16)} is in the ` +
+        `reserved range (0x100–0x1FF) and cannot be sent in this distribution.`
+      );
+    }
     let count = 0;
     for (const [, session] of this._sessions) {
       if (session.ready && session.send(typeId, payload)) count++;
@@ -127,6 +156,12 @@ class MeshNode extends EventEmitter {
    * Send to a specific peer by peerId.
    */
   sendTo(peerId, typeId, payload) {
+    if (isCoreSystemType(typeId)) {
+      throw new Error(
+        `[xmrigger-mesh] Channel 0x${typeId.toString(16)} is in the ` +
+        `reserved range (0x100–0x1FF) and cannot be sent in this distribution.`
+      );
+    }
     const session = this._sessions.get(peerId);
     return session ? session.send(typeId, payload) : false;
   }
@@ -202,11 +237,8 @@ class MeshNode extends EventEmitter {
       this.emit('message', { typeId, payload, peerId });
     });
 
-    session.on('system-message', ({ typeId, payload, peerId }) => {
-      // Cannot relay system messages — raw frame is already decrypted at this point.
-      // Nodes without a system key silently drop system channel messages.
-      this.emit('system-message', { typeId, payload, peerId });
-    });
+    // 0x100–0x1FF frames are decrypted and silently dropped.
+    // This node does not relay, emit, or acknowledge them in any way.
 
     session.on('close', () => {
       this._sessions.delete(session.peerId);
