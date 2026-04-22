@@ -8,6 +8,11 @@
  *   Both sides derive shared key via X25519 ECDH.
  *   All further frames: encrypt(pad(JSON)) with AES-256-GCM.
  *
+ * Channel routing on receive:
+ *   0x01–0xFF    open channels → 'message' event
+ *   0x100–0x1FF  core system   → silently dropped (send blocked, receive discarded)
+ *   0x200–0xFFFF extensions    → 'message' event (node decides if handler exists)
+ *
  * @version  0.1.0
  * @released 2026-04-18
  * @license  LGPL-2.1
@@ -15,7 +20,7 @@
 
 const { EventEmitter }  = require('events');
 const { generateEphemeralKeypair, deriveSessionKey, encrypt, decrypt, pad, unpad } = require('./crypto');
-const { isSystemType, typeName } = require('./types');
+const { isCoreSystemType, typeName } = require('./types');
 
 const PROTOCOL_VERSION = 1;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
@@ -26,14 +31,12 @@ class Session extends EventEmitter {
    * @param {WebSocket}  opts.ws
    * @param {boolean}    opts.isInitiator
    * @param {Buffer}     opts.nodeId        Our node public identity (32B)
-   * @param {Function}   [opts.hasSystemKey]  () => boolean
    */
-  constructor({ ws, isInitiator, nodeId, hasSystemKey = () => false }) {
+  constructor({ ws, isInitiator, nodeId }) {
     super();
-    this.ws           = ws;
-    this.isInitiator  = isInitiator;
-    this.nodeId       = nodeId;
-    this.hasSystemKey = hasSystemKey;
+    this.ws          = ws;
+    this.isInitiator = isInitiator;
+    this.nodeId      = nodeId;
 
     this._key         = null;   // session key after handshake
     this._ready       = false;
@@ -64,7 +67,7 @@ class Session extends EventEmitter {
 
   send(typeId, payload) {
     if (!this._ready) return false;
-    if (isSystemType(typeId) && !this.hasSystemKey()) return false;
+    if (isCoreSystemType(typeId)) return false;
     const plain = pad(Buffer.from(JSON.stringify({ t: typeId, d: payload })));
     const frame = encrypt(this._key, plain);
     try {
@@ -93,13 +96,7 @@ class Session extends EventEmitter {
 
     const { t: typeId, d: payload } = msg;
 
-    if (isSystemType(typeId)) {
-      // System channels are emitted as events but NOT relayed — the raw frame
-      // is already decrypted and cannot be re-encrypted for forwarding.
-      // Without a system key, these messages are silently consumed here.
-      this.emit('system-message', { typeId, payload, peerId: this._peerId });
-      return;
-    }
+    if (isCoreSystemType(typeId)) return;  // 0x100–0x1FF: silently drop
 
     this.emit('message', { typeId, payload, peerId: this._peerId });
   }
