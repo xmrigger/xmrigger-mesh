@@ -33,6 +33,12 @@ const { OPEN, typeName, isCoreSystemType, isExtensionType } = require('./types')
 const RECONNECT_MS      = 15_000;
 const PEER_STALE_MS     = 120_000;
 
+// Pre-handshake payload cap. The largest legitimate frame in a session is
+// the largest pad bucket (2048) + AAD/AEAD overhead (~30 bytes). Anything
+// significantly larger than that is either misuse or an attacker trying
+// to exhaust memory in JSON.parse before the handshake is complete.
+const MAX_WS_PAYLOAD    = 4096;
+
 class MeshNode extends EventEmitter {
   /**
    * @param {object}   opts
@@ -84,6 +90,10 @@ class MeshNode extends EventEmitter {
   stop() {
     for (const [, s] of this._sessions) { try { s.ws.terminate(); } catch {} }
     for (const [, t] of this._reconnectTimers) clearTimeout(t);
+    // Without clearing the map, a subsequent start() finds stale entries
+    // and _scheduleReconnect short-circuits forever — the seed list looks
+    // "already scheduled" even though no timer is actually armed.
+    this._reconnectTimers.clear();
     if (this._wss) this._wss.close();
     if (this._server) this._server.close();
     this._sessions.clear();
@@ -176,7 +186,9 @@ class MeshNode extends EventEmitter {
         ? https.createServer({ cert: this.tls.cert, key: this.tls.key })
         : http.createServer();
 
-      this._wss = new WebSocketServer({ server: this._server });
+      // maxPayload caps individual WS frame size pre-handshake. Default
+      // ws library is 100MB, which is a free DoS vector from a single peer.
+      this._wss = new WebSocketServer({ server: this._server, maxPayload: MAX_WS_PAYLOAD });
       this._wss.on('connection', (ws) => this._accept(ws));
       this._server.listen(this.port, resolve);
     });
@@ -194,7 +206,7 @@ class MeshNode extends EventEmitter {
   // ── Client ────────────────────────────────────────────────────────────────
 
   _connect(url) {
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(url, { maxPayload: MAX_WS_PAYLOAD });
     ws.on('open', () => {
       const session = new Session({
         ws,
@@ -220,6 +232,17 @@ class MeshNode extends EventEmitter {
 
   _wire(session) {
     session.on('ready', ({ peerId }) => {
+      // Race protection: if a session for this peerId already exists,
+      // tear down whichever is the duplicate. With peerId derived from
+      // the peer's ECDH pubkey (rotated per session), a collision means
+      // either (a) the same peer raced two parallel connections, or
+      // (b) something pathological. Either way, keeping both leaves an
+      // orphan WS open until TCP keepalive (~minutes), which is a leak.
+      const existing = this._sessions.get(peerId);
+      if (existing && existing !== session) {
+        try { session.ws.terminate(); } catch {}
+        return;
+      }
       this._sessions.set(peerId, session);
       this.emit('peer-connected', { peerId: peerId.slice(0, 16) });
 
