@@ -17,6 +17,60 @@ gossip mesh with one hop of relay.
 
 ---
 
+## Scope and design intent
+
+xmrigger-mesh was designed and validated for a single class of use case:
+**federation between independent `xmrigger-proxy` operators**, so that they
+can exchange timing-sensitive mining signals (most importantly prevhash
+announcements and hashrate concentration alerts) and collectively detect
+selfish-mining behaviour that no isolated proxy would notice on its own.
+
+That intent shapes every concrete choice in this codebase:
+
+- four open channels (`PEER_HELLO`, `PEER_BYE`, `PREVHASH_ANNOUNCE`,
+  `GUARD_ALERT`) covering only the federation handshake and the two
+  detection signals
+- single-hop relay, no routing, no DHT
+- fixed-size bucket padding sized for short signal frames (≤ 2 KB), not
+  for application payloads
+- bandwidth budget per peer designed for ones-of-frames-per-second, not
+  ones-of-megabits-per-second
+- handler registration in the `0x100–0x1FF` range is blocked at API level
+  precisely because that range is not part of the validated scope of this
+  library
+
+### Non-goals
+
+The following uses are **explicitly outside the scope** for which the
+protocol, the threat model, and the implementation were designed:
+
+- marketplaces, listings directories, or service-discovery services
+- anonymous or pseudonymous messaging between end users
+- file transfer or any form of bulk data routing
+- general-purpose pub/sub for application traffic
+- identity bridging across separate networks
+- coordination channels for software not directly related to the
+  anti-selfish-mining federation it was built to support
+
+The cryptographic primitives in this library (X25519, AES-256-GCM,
+ChaCha20-Poly1305 in derivatives) are standard and can in principle be
+used to build other things. Forks that do so operate **outside the scope
+this library was validated for**; the authors do not endorse, support,
+or take responsibility for such derivative uses, and the security
+analysis published here does not extend to them.
+
+### Hard-blocked range
+
+Channel IDs `0x100`–`0x1FF` are reserved at the API level and silently
+dropped on receive (see `types.js`). This is a **scope marker, not a
+security boundary**: a fork that removes the check can deliver those
+frames to its own handlers. Operators integrating xmrigger-mesh should
+not rely on the reserved range as an authorisation mechanism for
+cross-organisation traffic. Cross-organisation, authenticated traffic
+belongs on a separate transport with its own access control.
+
+---
+
 ## Encryption
 
 Each session uses an ephemeral X25519 key exchange. All frames are encrypted
