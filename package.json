@@ -1,7 +1,7 @@
 {
   "name": "xmrigger-mesh",
-  "version": "0.1.0",
-  "description": "Encrypted P2P gossip mesh for xmrigger proxy federation. One external dependency: ws.",
+  "version": "0.3.0",
+  "description": "Encrypted P2P gossip mesh for xmrigger proxy federation. Per-peer rate limit + strike/quarantine/ban defense. One external dependency: ws.",
   "author": "tnzx@proton.me",
   "license": "LGPL-2.1",
   "main": "index.js",
@@ -20,7 +20,9 @@
   ],
   "scripts": {
     "demo": "node poc/demo.js",
-    "test": "node test/index.js"
+    "test": "node test/index.js",
+    "test:limits": "node test/limits.test.js",
+    "test:e2e": "node test/e2e-flood.test.js"
   },
   "dependencies": {
     "ws": "^8.0.0"

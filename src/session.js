@@ -118,6 +118,11 @@ class Session extends EventEmitter {
   _onRaw(data) {
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
+    // Pre-decrypt size signal — lets the node-level limiter rate by raw
+    // frame size BEFORE paying the AEAD cost. Emitted only post-handshake;
+    // pre-handshake HELLO is capped by MAX_HELLO_LEN already.
+    if (this._ready) this.emit('raw-in', { size: buf.length });
+
     if (!this._ready) {
       this._onHandshake(buf);
       return;
@@ -143,7 +148,12 @@ class Session extends EventEmitter {
 
     const { t: typeId, d: payload } = msg;
 
-    if (isCoreSystemType(typeId)) return;  // 0x100–0x1FF: silently drop
+    if (isCoreSystemType(typeId)) {
+      // 0x100–0x1FF: not delivered to handlers, but the attempt is signalled
+      // so the node-level limiter can strike a peer probing reserved channels.
+      this.emit('policy-violation', { typeId, peerId: this._peerId, reason: 'reserved-band' });
+      return;
+    }
 
     this.emit('message', { typeId, payload, peerId: this._peerId });
   }

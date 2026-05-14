@@ -29,6 +29,7 @@ const { WebSocket, WebSocketServer } = require('ws');
 const { generateEphemeralKeypair } = require('./crypto');
 const { Session } = require('./session');
 const { OPEN, typeName, isCoreSystemType, isExtensionType } = require('./types');
+const { PeerLimiter } = require('./limits');
 
 const RECONNECT_MS      = 15_000;
 const PEER_STALE_MS     = 120_000;
@@ -56,6 +57,7 @@ class MeshNode extends EventEmitter {
     name            = 'xmrigger-mesh-node',
     minPeersForAlert = 2,
     tls             = null,
+    limits          = {},
   } = {}) {
     super();
     this.seeds            = seeds;
@@ -70,11 +72,21 @@ class MeshNode extends EventEmitter {
     this._nodePriv = privateKey;
     this._nodeId   = publicKey;  // SPKI DER Buffer
 
+    // Defense layer: per-peer rate limiter + ban list. ON by default — pass
+    // limits=false to disable (e.g. trusted internal mesh). Pass a config
+    // object to override profile/persistence.
+    if (limits === false) {
+      this._limiter = null;
+    } else {
+      this._limiter = new PeerLimiter(limits || {});
+    }
+
     this._sessions   = new Map();   // peerId → Session
     this._handlers   = new Map();   // typeId → Function
     this._server     = null;
     this._wss        = null;
     this._reconnectTimers = new Map();
+    this._lastRawSize = new Map();  // peerId → bytes (set by raw-in, read by message)
   }
 
   get nodeId() { return this._nodeId.toString('hex').slice(0, 16); }
@@ -195,11 +207,19 @@ class MeshNode extends EventEmitter {
   }
 
   _accept(ws) {
+    // Fast-path ban check before paying handshake CPU.
+    const ip = this._remoteIp(ws);
+    if (this._limiter && ip && this._limiter.banList.isBanned(ip)) {
+      this.emit('peer-rejected', { ip, reason: 'banned' });
+      try { ws.terminate(); } catch {}
+      return;
+    }
     const session = new Session({
       ws,
       isInitiator: false,
       nodeId: this._nodeId,
     });
+    session._remoteIp = ip;
     this._wire(session);
   }
 
@@ -213,10 +233,20 @@ class MeshNode extends EventEmitter {
         isInitiator: true,
         nodeId: this._nodeId,
       });
+      // Outbound: we don't have a remote IP to ban-check; the server side will.
       this._wire(session);
     });
     ws.on('error', () => this._scheduleReconnect(url));
     ws.on('close', () => this._scheduleReconnect(url));
+  }
+
+  _remoteIp(ws) {
+    try {
+      const r = ws._socket && ws._socket.remoteAddress;
+      if (!r) return null;
+      // Normalize IPv4-mapped IPv6
+      return r.startsWith('::ffff:') ? r.slice(7) : r;
+    } catch { return null; }
   }
 
   _scheduleReconnect(url) {
@@ -231,6 +261,33 @@ class MeshNode extends EventEmitter {
   // ── Session wiring ────────────────────────────────────────────────────────
 
   _wire(session) {
+    // Track raw inbound frame size for the next 'message' decode. Stored on
+    // the session object so concurrent peers don't shadow each other.
+    session.on('raw-in', ({ size }) => { session._lastRawSize = size; });
+
+    // Policy violations (reserved-band probing) are funneled straight into
+    // the limiter as a strike. No handler dispatch happens for these frames.
+    session.on('policy-violation', ({ typeId, peerId }) => {
+      if (!this._limiter) return;
+      const verdict = this._limiter.check({
+        peerId,
+        typeId,                              // 0x100–0x1FF
+        frameSize: session._lastRawSize || 0,
+        ip: session._remoteIp,
+        nodeId: null,
+      });
+      this.emit('peer-throttled', {
+        peerId: peerId && peerId.slice(0, 16),
+        typeId,
+        reason: verdict.reason || 'reserved-band-violation',
+        escalate: verdict.escalate || null,
+      });
+      if (verdict.escalate === 'hard' || verdict.escalate === 'ban') {
+        try { session.ws.terminate(); } catch {}
+        this._limiter.forget(peerId);
+      }
+    });
+
     session.on('ready', ({ peerId }) => {
       // Race protection: if a session for this peerId already exists,
       // tear down whichever is the duplicate. With peerId derived from
@@ -251,6 +308,31 @@ class MeshNode extends EventEmitter {
     });
 
     session.on('message', ({ typeId, payload, peerId }) => {
+      // Defense gate: rate limit + strike escalation BEFORE handler dispatch.
+      if (this._limiter) {
+        const verdict = this._limiter.check({
+          peerId,
+          typeId,
+          frameSize: session._lastRawSize || 0,
+          ip: session._remoteIp,
+          nodeId: null, // future: persistent nodeId once HKDF-from-seed lands
+        });
+        if (!verdict.allow) {
+          this.emit('peer-throttled', {
+            peerId: peerId && peerId.slice(0, 16),
+            typeId,
+            reason: verdict.reason,
+            escalate: verdict.escalate || null,
+          });
+          if (verdict.escalate === 'hard' || verdict.escalate === 'ban') {
+            // Tear down the session — soft quarantine keeps it alive.
+            try { session.ws.terminate(); } catch {}
+            this._limiter.forget(peerId);
+          }
+          return;  // drop the frame
+        }
+      }
+
       const handler = this._handlers.get(typeId);
       if (handler) {
         try { handler({ payload, peerId }); } catch (e) {
@@ -260,11 +342,16 @@ class MeshNode extends EventEmitter {
       this.emit('message', { typeId, payload, peerId });
     });
 
-    // 0x100–0x1FF frames are decrypted and silently dropped.
-    // This node does not relay, emit, or acknowledge them in any way.
+    // 0x100–0x1FF frames are decrypted and silently dropped at the session
+    // layer. The limiter ALSO sees them via this 'message' hook only when
+    // the session subclass routes them up — base session.js drops in _onRaw
+    // before emit, so the reserved-band strike currently fires only if a
+    // subclass overrides to expose those frames. This is the intended
+    // contract: open distribution = no reserved exposure = no strike path.
 
     session.on('close', () => {
       this._sessions.delete(session.peerId);
+      if (this._limiter && session.peerId) this._limiter.forget(session.peerId);
       if (session.peerId) {
         this.emit('peer-disconnected', { peerId: session.peerId.slice(0, 16) });
       }
@@ -272,6 +359,7 @@ class MeshNode extends EventEmitter {
 
     session.on('error', () => {
       this._sessions.delete(session.peerId);
+      if (this._limiter && session.peerId) this._limiter.forget(session.peerId);
     });
   }
 }

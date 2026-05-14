@@ -49,9 +49,10 @@ describe('Crypto layer — ECDH + AES-256-GCM', () => {
     const keyBob   = deriveSessionKey(bob.privateKey,   alice.publicKey);
 
     const plaintext  = Buffer.from('Hello from Alice — secret prevhash: deadbeef01234567');
-    const ciphertext = encrypt(keyAlice, plaintext);
+    // Wire format now includes 5-byte AAD (1B dir + 4B seq). Both sides must
+    // pass matching values; we use dir=0 (initiator), seq=1 for this round-trip.
+    const ciphertext = encrypt(keyAlice, plaintext, 0, 1);
 
-    // Wire format: nonce(12) + ciphertext + tag(16)
     assert.ok(ciphertext.length >= NONCE_LEN + TAG_LEN,
       'ciphertext must include nonce and tag');
     assert.ok(!ciphertext.equals(plaintext),
@@ -59,7 +60,10 @@ describe('Crypto layer — ECDH + AES-256-GCM', () => {
 
     const recovered = decrypt(keyBob, ciphertext);
     assert.ok(recovered !== null, 'decrypt must succeed with correct key');
-    assert.ok(recovered.equals(plaintext), 'decrypted plaintext must match original');
+    assert.ok(recovered.plaintext.equals(plaintext),
+      'decrypted plaintext must match original');
+    assert.strictEqual(recovered.dir, 0, 'dir must round-trip via AAD');
+    assert.strictEqual(recovered.seq, 1, 'seq must round-trip via AAD');
   });
 
   test('decryption fails with wrong nonce (integrity check)', () => {
@@ -70,7 +74,7 @@ describe('Crypto layer — ECDH + AES-256-GCM', () => {
     const keyBob   = deriveSessionKey(bob.privateKey,   alice.publicKey);
 
     const plaintext  = Buffer.from('sensitive data');
-    const ciphertext = encrypt(keyAlice, plaintext);
+    const ciphertext = encrypt(keyAlice, plaintext, 0, 1);
 
     // Corrupt the nonce (first 12 bytes) — the GCM tag will not verify
     const tampered = Buffer.from(ciphertext);
@@ -89,7 +93,7 @@ describe('Crypto layer — ECDH + AES-256-GCM', () => {
     const keyBob   = deriveSessionKey(bob.privateKey,   alice.publicKey);
 
     const plaintext  = Buffer.from('another secret message 12345');
-    const ciphertext = encrypt(keyAlice, plaintext);
+    const ciphertext = encrypt(keyAlice, plaintext, 0, 1);
 
     // Flip a byte in the middle of the ciphertext body (after nonce)
     const tampered = Buffer.from(ciphertext);
@@ -108,11 +112,11 @@ describe('Crypto layer — ECDH + AES-256-GCM', () => {
     const keyBob   = deriveSessionKey(bob.privateKey,   alice.publicKey);
 
     const plaintext  = Buffer.alloc(0);
-    const ciphertext = encrypt(keyAlice, plaintext);
+    const ciphertext = encrypt(keyAlice, plaintext, 0, 1);
     const recovered  = decrypt(keyBob,   ciphertext);
 
     assert.ok(recovered !== null, 'decrypt of empty plaintext must succeed');
-    assert.strictEqual(recovered.length, 0, 'recovered length must be 0');
+    assert.strictEqual(recovered.plaintext.length, 0, 'recovered plaintext length must be 0');
   });
 
 });
@@ -147,12 +151,17 @@ describe('Bucket padding', () => {
   });
 
   test('payload sizes in different ranges land in correct buckets', () => {
+    // pad() reserves the trailing 2 bytes for the length field, so the bucket
+    // chosen is the smallest one that fits buf.length + 2. Boundary cases
+    // (254/510/1022) sit exactly at the previous bucket's effective capacity.
     const cases = [
       { size: 1,    expected: 256  },
       { size: 100,  expected: 256  },
-      { size: 255,  expected: 256  },
+      { size: 254,  expected: 256  },   // 254 + 2 = 256, fits
+      { size: 255,  expected: 512  },   // 255 + 2 = 257, bumps to 512
       { size: 257,  expected: 512  },
-      { size: 511,  expected: 512  },
+      { size: 510,  expected: 512  },   // 510 + 2 = 512, fits
+      { size: 511,  expected: 1024 },   // 511 + 2 = 513, bumps to 1024
       { size: 513,  expected: 1024 },
       { size: 1025, expected: 2048 },
     ];
