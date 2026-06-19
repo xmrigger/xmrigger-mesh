@@ -13,7 +13,7 @@
  *
  * Channel bands (from types.js):
  *   OPEN     : 0x01–0xFF   — public, anyone can use
- *   RESERVED : 0x100–0x1FF — TNZX core system (hard-blocked locally)
+ *   RESERVED : 0x100–0x1FF — core system reserved range (hard-blocked locally)
  *   EXTENSION: 0x200+      — subclass extensions
  *
  * Token bucket semantics: capacity C, refill R tokens/sec. A frame
